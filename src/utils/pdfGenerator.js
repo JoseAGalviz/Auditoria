@@ -12,13 +12,23 @@ const currency = (val) => {
 export const generateVendorPDF = (
   vendorName,
   selectedCompanies,
-  targetDayKey,
+  fechaPlanificacion,
 ) => {
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
     format: "a4",
   });
+
+  const fechaLabel = fechaPlanificacion
+    ? new Date(fechaPlanificacion).toLocaleDateString("es-VE", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC",
+      })
+    : new Date().toLocaleDateString("es-VE", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   // --- TÍTULOS ---
   doc.setFontSize(18);
@@ -27,45 +37,9 @@ export const generateVendorPDF = (
 
   doc.setFontSize(9);
   doc.setTextColor(100);
-  doc.text(
-    `Generado: ${new Date().toLocaleString()} | Clientes: ${selectedCompanies.length}`,
-    14,
-    22,
-  );
+  doc.text(`Fecha: ${fechaLabel} | Clientes: ${selectedCompanies.length}`, 14, 22);
 
-  // --- 2. DEFINIR DÍAS DE LA AGENDA ---
-  const days = [
-    { key: "lunes", label: "Lun" },
-    { key: "martes", label: "Mar" },
-    { key: "miercoles", label: "Mie" },
-    { key: "jueves", label: "Jue" },
-    { key: "viernes", label: "Vie" },
-  ];
-
-  const dayKeysMap = {
-    1: "lunes",
-    2: "martes",
-    3: "miercoles",
-    4: "jueves",
-    5: "viernes",
-  };
-
-  const fallbackCurrentDay = dayKeysMap[new Date().getDay()] || "lunes";
-  const safeTargetDay =
-    days.find((day) => day.key === targetDayKey)?.key || fallbackCurrentDay;
-  const activeDays = days.filter((day) => day.key === safeTargetDay);
-
-  const getTaskForDay = (item, dayKey) => {
-    const nestedTask = item?.semana?.[dayKey]?.tarea;
-    const flatTask = item?.[`${dayKey}_tarea`];
-    const task = nestedTask ?? flatTask;
-    if (task === undefined || task === null) return "-";
-
-    const normalized = String(task).trim();
-    return normalized.length > 0 ? normalized : "-";
-  };
-
-  // --- 3. DEFINIR COLUMNAS ---
+  // --- 2. DEFINIR COLUMNAS ---
   const columnsDef = [
     { title: "Cód.", dataKey: "codigo", width: 18, align: "center" },
     { title: "Cliente", dataKey: "nombre", width: 45, align: "center" },
@@ -74,51 +48,31 @@ export const generateVendorPDF = (
     { title: "Límite", dataKey: "limite", width: 18, align: "center" },
     { title: "Tránsito", dataKey: "transito", width: 18, align: "center" },
     { title: "Vencido", dataKey: "vencido", width: 18, align: "center" },
-    {
-      title: "Últ. Compra",
-      dataKey: "fecha_compra",
-      width: 18,
-      align: "center",
-    },
+    { title: "Últ. Compra", dataKey: "fecha_compra", width: 18, align: "center" },
     { title: "Morosidad", dataKey: "morosidad", width: 16, align: "center" },
     { title: "SKU", dataKey: "sku", width: 12, align: "center" },
     { title: "Clasif", dataKey: "clasif", width: 10, align: "center" },
+    { title: "Tarea", dataKey: "tarea", width: "auto", align: "left" },
+    { title: "Acción", dataKey: "accion", width: "auto", align: "left" },
   ];
 
-  // Agregar solo la columna del día objetivo
-  activeDays.forEach((day) => {
-    columnsDef.push({
-      title: day.label,
-      dataKey: day.key,
-      width: "auto",
-      align: "center",
-    });
-  });
-
-  // --- 4. MAPEO DE DATOS ---
-  const tableBody = selectedCompanies.map((item) => {
-    const rowData = {
-      codigo: item.codigo_profit || item.codigo || "-",
-      nombre: item.nombre,
-      ciudad: item.zona || item.ciudad || "-",
-      coordenadas: item.coordenadas || "-",
-      limite: currency(item.limite_credito),
-      transito: currency(item.saldo_transito),
-      vencido: currency(item.saldo_vencido),
-      _vencidoRaw: item.saldo_vencido,
-      fecha_compra: item.fecha_ultima_compra || item.fecha_compra || "-",
-      sku: item.sku_mes || "-",
-      morosidad: item.factura_morosidad || "-",
-      clasif: item.clasificacion || item.horario_caja || "-",
-    };
-
-    // Cargar la tarea del día objetivo
-    activeDays.forEach((day) => {
-      rowData[day.key] = getTaskForDay(item, day.key);
-    });
-
-    return rowData;
-  });
+  // --- 3. MAPEO DE DATOS ---
+  const tableBody = selectedCompanies.map((item) => ({
+    codigo: item.codigo_profit || item.codigo || "-",
+    nombre: item.nombre,
+    ciudad: item.zona || item.ciudad || "-",
+    coordenadas: item.coordenadas || "-",
+    limite: currency(item.limite_credito),
+    transito: currency(item.saldo_transito),
+    vencido: currency(item.saldo_vencido),
+    _vencidoRaw: item.saldo_vencido,
+    fecha_compra: item.fecha_ultima_compra || item.fecha_compra || "-",
+    sku: item.sku_mes || "-",
+    morosidad: item.factura_morosidad || "-",
+    clasif: item.clasificacion || item.horario_caja || "-",
+    tarea: String(item.tarea || "").trim() || "-",
+    accion: String(item.accion || "").trim() || "-",
+  }));
 
   // --- 5. ESTILOS DE COLUMNAS ---
   const dynamicColumnStyles = {};

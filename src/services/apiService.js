@@ -1,4 +1,4 @@
-const BASE_URL = "http://192.168.4.23:3000/api";
+const BASE_URL = "http://192.168.4.69:3000/api";
 const BASE_AUTH_URL = "http://192.168.4.23:3000/api/usuarios";
 
 const getAuthHeaders = () => {

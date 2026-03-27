@@ -38,34 +38,6 @@ const formatCurrency = (amount) => {
 
 // --- COMPONENTES UI ---
 
-const DayCard = ({ day, data }) => {
-  if (!data?.tarea && !data?.accion) return null;
-  const isCobranza = data.tarea?.toLowerCase().includes("cobranza");
-
-  return (
-    <div
-      className={`text-[10px] sm:text-xs p-1.5 rounded border mb-1 last:mb-0 transition-all ${
-        isCobranza
-          ? "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-900/20 dark:border-rose-800 dark:text-rose-300"
-          : "bg-blue-50 border-blue-100 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
-      }`}
-    >
-      <div className="font-bold uppercase mb-0.5 opacity-70 tracking-wider">
-        {day}
-      </div>
-      {data.tarea && (
-        <div className="font-semibold line-clamp-1" title={data.tarea}>
-          {data.tarea}
-        </div>
-      )}
-      {data.accion && (
-        <div className="italic opacity-80 line-clamp-1" title={data.accion}>
-          {data.accion}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const PlanificacionHeader = ({
   headerData,
@@ -224,7 +196,7 @@ const PlanificacionTable = ({ items }) => (
         <tr>
           <th className="p-4 w-1/4">Cliente / Ruta</th>
           <th className="p-4 w-1/4">Estado Financiero</th>
-          <th className="p-4 w-1/2">Agenda Semanal</th>
+          <th className="p-4 w-1/2">Tarea / Acción</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -308,37 +280,29 @@ const PlanificacionTable = ({ items }) => (
                 </div>
               </td>
 
-              {/* Columna Semana */}
+              {/* Columna Tarea / Acción */}
               <td className="p-4 align-top">
-                {item.semana ? (
-                  <div className="grid grid-cols-5 gap-2">
-                    {["lunes", "martes", "miercoles", "jueves", "viernes"].map(
-                      (day) => (
-                        <div key={day} className="min-w-[60px]">
-                          {item.semana[day]?.tarea || item.semana[day]?.accion ? (
-                            <DayCard
-                              day={day.slice(0, 3)}
-                              data={item.semana[day]}
-                            />
-                          ) : (
-                            <div className="h-full min-h-[40px] rounded bg-gray-50 dark:bg-gray-800/50 border border-dashed border-gray-100 dark:border-gray-700 flex items-center justify-center">
-                              <span className="text-gray-300 dark:text-gray-600 text-[10px]">
-                                •
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ),
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-gray-400 text-xs italic">
-                    Sin agenda registrada
-                  </span>
-                )}
+                {(() => {
+                  const tarea = item.full_data?.gestion?.tarea;
+                  const accion = item.full_data?.gestion?.accion;
+                  const isCobranza = tarea?.toLowerCase().includes("cobranza");
+
+                  return tarea || accion ? (
+                    <div className={`p-3 rounded-lg border text-xs ${
+                      isCobranza
+                        ? "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-900/20 dark:border-rose-800 dark:text-rose-300"
+                        : "bg-blue-50 border-blue-100 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+                    }`}>
+                      {tarea && <p className="font-semibold">{tarea}</p>}
+                      {accion && <p className="mt-1 italic opacity-80">{accion}</p>}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 text-xs italic">Sin tarea registrada</span>
+                  );
+                })()}
 
                 {item.obs_ejecutiva && (
-                  <div className="mt-3 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-2 rounded-lg flex gap-2 items-start">
+                  <div className="mt-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-2 rounded-lg flex gap-2 items-start">
                     <span className="font-bold">Nota:</span>
                     <span className="italic">"{item.obs_ejecutiva}"</span>
                   </div>
@@ -460,21 +424,21 @@ const Planificaciones = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRutas, setSelectedRutas] = useState([]);
-  const [filterDate, setFilterDate] = useState("");
+  const todayISO = new Date().toLocaleDateString("en-CA");
+  const [filterDate, setFilterDate] = useState(todayISO);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [rutaSearchTerm, setRutaSearchTerm] = useState("");
 
   // Ref para cerrar el menú al hacer click fuera
   const menuRef = useRef(null);
 
-  // Carga de datos
+  // Carga de datos — se re-ejecuta cuando cambia la fecha del filtro
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await apiService.getPlanificacion({
-          historico: "true",
-        });
+        const fecha = filterDate || todayISO;
+        const response = await apiService.getPlanificacion({ fecha });
         const cleanData = Array.isArray(response)
           ? response
           : response?.data || [];
@@ -487,7 +451,7 @@ const Planificaciones = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [filterDate]);
 
   // Cerrar menú al hacer click fuera
   useEffect(() => {
@@ -530,15 +494,7 @@ const Planificaciones = () => {
         selectedRutas.length === 0 ||
         selectedRutas.includes(item.full_data?.segmento);
 
-      let matchesDate = true;
-      if (filterDate) {
-        // Ajuste de zona horaria (YYYY-MM-DD local)
-        const dateObj = new Date(item.fecha_registro);
-        const itemDate = dateObj.toLocaleDateString("en-CA");
-        matchesDate = itemDate === filterDate;
-      }
-
-      return matchesSearch && matchesRuta && matchesDate;
+      return matchesSearch && matchesRuta;
     });
 
     // --- 3. AGRUPAMIENTO ---
@@ -564,7 +520,7 @@ const Planificaciones = () => {
 
     // --- 6. RETORNO FINAL ---
     return sortedGroups;
-  }, [data, searchTerm, selectedRutas, filterDate]);
+  }, [data, searchTerm, selectedRutas]);
 
   if (loading) {
     return (

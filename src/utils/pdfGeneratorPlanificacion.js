@@ -42,96 +42,48 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
 
   // --- 2. DIBUJAR ENCABEZADO ---
   doc.setFontSize(18);
-  doc.setTextColor(26, 152, 136); // Color Teal (#1a9888)
-  doc.text("Reporte de Planificación Semanal", 14, 15);
+  doc.setTextColor(26, 152, 136);
+  doc.text("Reporte de Planificación", 14, 15);
 
   doc.setFontSize(10);
   doc.setTextColor(80);
   doc.text(`Vendedor: ${vendedor}`, 14, 22);
   doc.text(`Fecha de Planificación: ${fechaReporte}`, 14, 27);
-
-  // Total clientes alineado a la derecha
   doc.text(`Total Clientes: ${items.length}`, 280, 22, { align: "right" });
 
-  // --- 3. DEFINIR COLUMNAS ---
-  const columns = [
-    { header: "Cliente", dataKey: "cliente" },
-    { header: "Cód.", dataKey: "codigo" },
-    { header: "Ruta", dataKey: "ruta" },
-    { header: "Vencido", dataKey: "vencido" }, // Deuda
-    { header: "Lun", dataKey: "lunes" },
-    { header: "Mar", dataKey: "martes" },
-    { header: "Mie", dataKey: "miercoles" },
-    { header: "Jue", dataKey: "jueves" },
-    { header: "Vie", dataKey: "viernes" },
-  ];
-
-  const days = ["lunes", "martes", "miercoles", "jueves", "viernes"];
-
-  // --- 4. MAPEO DE DATOS (BODY) ---
+  // --- 3. MAPEO DE DATOS (BODY) ---
   const body = items.map((item) => {
-    // Fila base
-    const row = {
+    const tarea = item.full_data?.gestion?.tarea || item.gestion?.tarea || "-";
+    const accion = item.full_data?.gestion?.accion || item.gestion?.accion || "-";
+    const tieneAccion = accion && accion !== "-";
+    const tieneTarea = tarea && tarea !== "-";
+
+    const tareaStyles = {
+      fontSize: 8,
+      valign: "middle",
+      fillColor: tieneTarea ? [254, 243, 199] : [255, 255, 255],
+      textColor: tieneTarea ? [120, 53, 15] : [100, 100, 100],
+    };
+
+    const accionStyles = {
+      fontSize: 8,
+      valign: "middle",
+      fillColor: tieneAccion ? [220, 252, 231] : [255, 255, 255],
+      textColor: tieneAccion ? [20, 83, 45] : [100, 100, 100],
+    };
+
+    return {
       cliente: item.nombre_cliente || "Sin Nombre",
       codigo: item.codigo_profit || "-",
       ruta: item.full_data?.segmento || "-",
       vencido: currency(item.full_data?.saldo_vencido),
       _vencidoRaw: item.full_data?.saldo_vencido || 0,
+      tarea: { content: tarea, styles: tareaStyles },
+      accion: { content: accion, styles: accionStyles },
     };
-
-    // Lógica para cada día
-    days.forEach((day) => {
-      // Intentar obtener datos del día desde el objeto anidado o plano
-      const dayData = item.semana?.[day] || {};
-
-      let content = "-";
-      let cellStyles = {
-        halign: "center",
-        fontSize: 7,
-        valign: "middle",
-        fillColor: [255, 255, 255],
-        textColor: [0, 0, 0],
-      };
-
-      // --- 1. TAREA (Planificado) ---
-      // Puede venir en item.semana[day].tarea o item[day + '_tarea']
-      const tareaVal = dayData.tarea ?? item[`${day}_tarea`];
-      const tarea = tareaVal ? `P: ${tareaVal}` : "";
-
-      // --- 2. ACCIÓN (Hecho/Visitado) ---
-      const accionVal = dayData.accion ?? item[`${day}_accion`];
-      const accion = accionVal ? `H: ${accionVal}` : "";
-
-      // --- 3. OBSERVACIÓN ---
-      const obsVal = dayData.observacion ?? item[`${day}_observacion`];
-      const observacion = obsVal ? `Obs: ${obsVal}` : "";
-
-      // Combinar textos
-      const parts = [tarea, accion, observacion].filter(Boolean);
-
-      if (parts.length > 0) {
-        content = parts.join("\n");
-      }
-
-      // --- LÓGICA DE COLORES ---
-      if (accionVal) {
-        // CASO 1: VISITADO (Tiene acción) -> VERDE CLARO
-        cellStyles.fillColor = [220, 252, 231];
-        cellStyles.textColor = [20, 83, 45];
-      } else if (tareaVal) {
-        // CASO 2: SOLO PLANIFICADO (Sin acción) -> ROJO CLARO
-        cellStyles.fillColor = [254, 226, 226];
-        cellStyles.textColor = [127, 29, 29];
-      }
-
-      // Asignar celda
-      row[day] = { content: content, styles: cellStyles };
-    });
-
-    return row;
   });
 
-  // --- 5. GENERAR TABLA ---
+  // --- 4. GENERAR TABLA ---
   autoTable(doc, {
     startY: 35,
     columns: [
@@ -139,11 +91,8 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
       { header: "Cód.", dataKey: "codigo" },
       { header: "Ruta", dataKey: "ruta" },
       { header: "Vencido", dataKey: "vencido" },
-      { header: "Lun", dataKey: "lunes" },
-      { header: "Mar", dataKey: "martes" },
-      { header: "Mie", dataKey: "miercoles" },
-      { header: "Jue", dataKey: "jueves" },
-      { header: "Vie", dataKey: "viernes" },
+      { header: "Tarea", dataKey: "tarea" },
+      { header: "Acción", dataKey: "accion" },
     ],
     body: body,
     theme: "grid",
@@ -164,11 +113,12 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
       lineColor: [200, 200, 200],
     },
     columnStyles: {
-      cliente: { cellWidth: 45 },
-      codigo: { cellWidth: 15, halign: "center" },
-      ruta: { cellWidth: 20, halign: "center" },
-      vencido: { cellWidth: 22, halign: "right", fontStyle: "bold" },
-      // Los días se reparten el resto del espacio automáticamente
+      cliente: { cellWidth: 55 },
+      codigo: { cellWidth: 18, halign: "center" },
+      ruta: { cellWidth: 22, halign: "center" },
+      vencido: { cellWidth: 25, halign: "right", fontStyle: "bold" },
+      tarea: { cellWidth: 80 },
+      accion: { cellWidth: 80 },
     },
     // Hook para pintar el texto de "Vencido" en rojo si es mayor a 0
     didParseCell: (data) => {

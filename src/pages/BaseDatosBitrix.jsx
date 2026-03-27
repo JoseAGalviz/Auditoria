@@ -378,36 +378,24 @@ const CompanyRow = React.memo(
           </Td>
         )}
 
-        {/* --- AGENDA SEMANAL --- */}
-        {renderDayCells(
-          "lunes",
-          "bg-indigo-50 dark:bg-indigo-900/20",
-          "",
-          row.visibility,
+        {/* --- PLANIFICACIÓN --- */}
+        {row.visibility?.tarea && (
+          <Td className="bg-indigo-50 dark:bg-indigo-900/20 min-w-50 align-middle">
+            <EditableCell
+              value={row.tarea}
+              onChange={(val) => handleCompanyChange(row.id_interno, "tarea", val)}
+              placeholder="Tarea..."
+            />
+          </Td>
         )}
-        {renderDayCells(
-          "martes",
-          "bg-white dark:bg-[#1e1e1e]",
-          "",
-          row.visibility,
-        )}
-        {renderDayCells(
-          "miercoles",
-          "bg-indigo-50 dark:bg-indigo-900/20",
-          "",
-          row.visibility,
-        )}
-        {renderDayCells(
-          "jueves",
-          "bg-white dark:bg-[#1e1e1e]",
-          "",
-          row.visibility,
-        )}
-        {renderDayCells(
-          "viernes",
-          "bg-indigo-50 dark:bg-indigo-900/20",
-          "border-r border-gray-200 dark:border-[#333]",
-          row.visibility,
+        {row.visibility?.accion && (
+          <Td className="bg-indigo-50 dark:bg-indigo-900/20 min-w-50 align-middle border-r border-gray-200 dark:border-[#333]">
+            <EditableCell
+              value={row.accion}
+              onChange={(val) => handleCompanyChange(row.id_interno, "accion", val)}
+              placeholder="Acción..."
+            />
+          </Td>
         )}
 
         {/* Guardar */}
@@ -498,7 +486,9 @@ const BaseDatosBitrix = () => {
 
   // --- MODAL DE CONFIRMACIÓN ---
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showRouteModal, setShowRouteModal] = useState(false); // Estado para el modal de ruta
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [pendingSaveData, setPendingSaveData] = useState(null);
   const [confirmData, setConfirmData] = useState({
     title: "",
     message: "",
@@ -529,12 +519,9 @@ const BaseDatosBitrix = () => {
     // Gestión
     bitacora: true,
     obs_ejecutiva: true,
-    // Agenda (Por días completos)
-    lunes: true,
-    martes: true,
-    miercoles: true,
-    jueves: true,
-    viernes: true,
+    // Planificación
+    tarea: true,
+    accion: true,
   });
 
   const [showColumnMenu, setShowColumnMenu] = useState(false);
@@ -563,17 +550,8 @@ const BaseDatosBitrix = () => {
     return keys.reduce((acc, key) => acc + (columnVisibility[key] ? 1 : 0), 0);
   };
 
-  // Agenda: cada día tiene 3 columnas fijas. Si el día está visible, colSpan 3, sino 0.
-  const getDayColSpan = (dayKey) => (columnVisibility[dayKey] ? 3 : 0);
-  const getAgendaTotalColSpan = () => {
-    return (
-      getDayColSpan("lunes") +
-      getDayColSpan("martes") +
-      getDayColSpan("miercoles") +
-      getDayColSpan("jueves") +
-      getDayColSpan("viernes")
-    );
-  };
+  const getAgendaTotalColSpan = () =>
+    (columnVisibility.tarea ? 1 : 0) + (columnVisibility.accion ? 1 : 0);
 
   const toggleSelect = useCallback((id_interno) => {
     setSelectedIds((prev) =>
@@ -652,33 +630,8 @@ const BaseDatosBitrix = () => {
       gestion: {
         bitacora: companyData.bitacora,
         obs_ejecutiva: companyData.obs_ejecutiva,
-        semana: {
-          lunes: {
-            accion: companyData.lunes_accion,
-            observacion: companyData.lunes_observacion,
-            tarea: companyData.lunes_tarea,
-          },
-          martes: {
-            accion: companyData.martes_accion,
-            observacion: companyData.martes_observacion,
-            tarea: companyData.martes_tarea,
-          },
-          miercoles: {
-            accion: companyData.miercoles_accion,
-            observacion: companyData.miercoles_observacion,
-            tarea: companyData.miercoles_tarea,
-          },
-          jueves: {
-            accion: companyData.jueves_accion,
-            observacion: companyData.jueves_observacion,
-            tarea: companyData.jueves_tarea,
-          },
-          viernes: {
-            accion: companyData.viernes_accion,
-            observacion: companyData.viernes_observacion,
-            tarea: companyData.viernes_tarea,
-          },
-        },
+        tarea: companyData.tarea,
+        accion: companyData.accion,
       },
       full_data: companyData,
     };
@@ -706,17 +659,19 @@ const BaseDatosBitrix = () => {
     [refresh, handleCompanyChange, showToast],
   );
 
-  const executeBulkSave = async (selectedEntities, vendor) => {
+  const executeBulkSave = async (selectedEntities, vendor, fechaRegistro) => {
     setIsBulkSaving(true);
-    setShowConfirm(false); // Cerrar cualquier modal previo
-    setShowRouteModal(false); // Cerrar modal de ruta
+    setShowConfirm(false);
+    setShowRouteModal(false);
     try {
-      // Construir array de payloads
       const bulkPayload = selectedEntities.map((entity) => ({
         ...preparePayload(entity),
         co_ven: vendor.value,
         vendedor: vendor.label,
         usuario: user?.nombre || user?.usuario || "Usuario desconocido",
+        fecha_registro: fechaRegistro,
+        fecha_planificacion: fechaRegistro,
+        fecha_planificacion_real: fechaRegistro,
       }));
 
       console.log("JSON enviado:", bulkPayload);
@@ -724,8 +679,7 @@ const BaseDatosBitrix = () => {
       // Enviar una sola petición con el array
       await apiService.savePlanificacion(bulkPayload);
 
-      const dayForPdf = lastPlannedDay || detectLastPlannedDay(selectedEntities);
-      generateVendorPDF(vendor.label, selectedEntities, dayForPdf);
+      generateVendorPDF(vendor.label, selectedEntities, fechaRegistro);
 
       showToast(
         `Proceso completado. ${selectedEntities.length} clientes guardados y PDF generado.`,
@@ -779,13 +733,21 @@ const BaseDatosBitrix = () => {
       return;
     }
 
-    // Configurar datos para el modal de ruta en lugar del ConfirmModal simple
+    // Primero preguntar si la planificación es para hoy o mañana
+    setPendingSaveData({ selectedEntities, vendor });
+    setShowDateModal(true);
+  };
+
+  const handleDateSelect = (fechaRegistro) => {
+    setShowDateModal(false);
+
+    const { selectedEntities, vendor } = pendingSaveData;
     setConfirmData({
-        clientData: selectedEntities,
-        vendorName: vendor.label,
-        onConfirm: () => executeBulkSave(selectedEntities, vendor),
+      clientData: selectedEntities,
+      vendorName: vendor.label,
+      onConfirm: () => executeBulkSave(selectedEntities, vendor, fechaRegistro),
     });
-    setShowRouteModal(true); // Mostrar el nuevo modal
+    setShowRouteModal(true);
   };
 
   const handleJumpSubmit = (e) => {
@@ -1057,16 +1019,10 @@ const BaseDatosBitrix = () => {
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">
-                      Agenda Semanal
+                      Planificación
                     </h4>
                     <div className="space-y-1">
-                      {[
-                        "lunes",
-                        "martes",
-                        "miercoles",
-                        "jueves",
-                        "viernes",
-                      ].map((key) => (
+                      {["tarea", "accion"].map((key) => (
                         <label
                           key={key}
                           className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded"
@@ -1204,7 +1160,7 @@ const BaseDatosBitrix = () => {
                     colSpan={getAgendaTotalColSpan()}
                     className="border-b border-r border-gray-200 dark:border-[#333] text-indigo-600 bg-indigo-50 dark:bg-indigo-900 text-center"
                   >
-                    Agenda Semanal (Tarea / Acción / Obs)
+                    Planificación
                   </Th>
                 )}
               </Tr>
@@ -1344,80 +1300,16 @@ const BaseDatosBitrix = () => {
                   </Th>
                 )}
 
-                {/* AGENDA SEMANAL */}
-                {/* LUNES */}
-                {columnVisibility.lunes && (
-                  <>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Lun {getFormattedDateForDay(1)}
-                    </Th>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Lun-Acc
-                    </Th>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Lun-Obs
-                    </Th>
-                  </>
+                {/* PLANIFICACIÓN */}
+                {columnVisibility.tarea && (
+                  <Th className="min-w-50 bg-indigo-50 dark:bg-indigo-900">
+                    Tarea
+                  </Th>
                 )}
-
-                {/* MARTES */}
-                {columnVisibility.martes && (
-                  <>
-                    <Th className="min-w-37.5 bg-white dark:bg-[#1e1e1e]">
-                      Mar {getFormattedDateForDay(2)}
-                    </Th>
-                    <Th className="min-w-37.5 bg-white dark:bg-[#1e1e1e]">
-                      Mar-Acc
-                    </Th>
-                    <Th className="min-w-37.5 bg-white dark:bg-[#1e1e1e]">
-                      Mar-Obs
-                    </Th>
-                  </>
-                )}
-
-                {/* MIERCOLES */}
-                {columnVisibility.miercoles && (
-                  <>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Mie {getFormattedDateForDay(3)}
-                    </Th>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Mie-Acc
-                    </Th>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Mie-Obs
-                    </Th>
-                  </>
-                )}
-
-                {/* JUEVES */}
-                {columnVisibility.jueves && (
-                  <>
-                    <Th className="min-w-37.5 bg-white dark:bg-[#1e1e1e]">
-                      Jue {getFormattedDateForDay(4)}
-                    </Th>
-                    <Th className="min-w-37.5 bg-white dark:bg-[#1e1e1e]">
-                      Jue-Acc
-                    </Th>
-                    <Th className="min-w-37.5 bg-white dark:bg-[#1e1e1e]">
-                      Jue-Obs
-                    </Th>
-                  </>
-                )}
-
-                {/* VIERNES */}
-                {columnVisibility.viernes && (
-                  <>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Vie {getFormattedDateForDay(5)}
-                    </Th>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Vie-Acc
-                    </Th>
-                    <Th className="min-w-37.5 bg-indigo-50 dark:bg-indigo-900">
-                      Vie-Obs
-                    </Th>
-                  </>
+                {columnVisibility.accion && (
+                  <Th className="min-w-50 bg-indigo-50 dark:bg-indigo-900">
+                    Acción
+                  </Th>
                 )}
               </Tr>
             </Thead>
@@ -1512,6 +1404,58 @@ const BaseDatosBitrix = () => {
         confirmLabel="Confirmar"
         cancelLabel="Cancelar"
       />
+
+      {/* MODAL: ¿PARA QUÉ DÍA ES LA PLANIFICACIÓN? */}
+      {showDateModal && (() => {
+        const nextBusinessDay = (from, skip) => {
+          const d = new Date(from);
+          let count = 0;
+          while (count < skip) {
+            d.setDate(d.getDate() + 1);
+            if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+          }
+          return d;
+        };
+        const toISO = (d) => d.toISOString().split("T")[0];
+        const toLabel = (d) =>
+          d.toLocaleDateString("es-VE", { weekday: "long", day: "2-digit", month: "short" });
+        const today = new Date();
+        const options = [
+          { iso: toISO(today), label: "Hoy", sub: toLabel(today), color: "bg-teal-600 hover:bg-teal-700" },
+          { iso: toISO(nextBusinessDay(today, 1)), label: "Próximo día hábil", sub: toLabel(nextBusinessDay(today, 1)), color: "bg-indigo-600 hover:bg-indigo-700" },
+          { iso: toISO(nextBusinessDay(today, 2)), label: "Segundo día hábil", sub: toLabel(nextBusinessDay(today, 2)), color: "bg-violet-600 hover:bg-violet-700" },
+        ];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-[#1a1f2e] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">
+                ¿Para cuándo es la planificación?
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                Selecciona la fecha de registro.
+              </p>
+              <div className="flex flex-col gap-2">
+                {options.map((opt) => (
+                  <button
+                    key={opt.iso}
+                    onClick={() => handleDateSelect(opt.iso)}
+                    className={`flex items-center justify-between w-full py-3 px-4 ${opt.color} text-white font-bold rounded-xl transition-colors`}
+                  >
+                    <span>{opt.label}</span>
+                    <span className="text-xs font-normal opacity-80 capitalize">{opt.sub}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowDateModal(false)}
+                className="mt-3 w-full py-2 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL DE RUTA */}
       {showRouteModal && (
