@@ -53,8 +53,8 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
 
   // --- 3. MAPEO DE DATOS (BODY) ---
   const body = items.map((item) => {
-    const tarea = item.full_data?.gestion?.tarea || item.gestion?.tarea || "-";
-    const accion = item.full_data?.gestion?.accion || item.gestion?.accion || "-";
+    const tarea = item.gestion?.tarea || item.full_data?.gestion?.tarea || "-";
+    const accion = item.gestion?.accion || item.full_data?.gestion?.accion || "-";
     const tieneAccion = accion && accion !== "-";
     const tieneTarea = tarea && tarea !== "-";
 
