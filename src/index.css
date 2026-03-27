@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --- PERSONALIZACIÓN DE SCROLLBAR --- */
+
+/* 1. Estilos Base (Para todos los navegadores) */
+* {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  /* Gris suave para modo claro */
+}
+
+/* 2. Estilos para WebKit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 8px;
+  /* Ancho vertical */
+  height: 8px;
+  /* Alto horizontal */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  /* Color de la barra (gris claro) */
+  border-radius: 20px;
+  /* Bordes redondeados */
+  border: 2px solid transparent;
+  /* Espacio alrededor */
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+  /* Color al pasar el mouse */
+}
+
+/* 3. ESTILOS MODO OSCURO (Dark Mode) */
+/* Cuando la clase 'dark' está presente en el HTML */
+
+.dark * {
+  /* Firefox Oscuro */
+  scrollbar-color: #334155 #0b1120;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0b1120;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border: 2px solid #0b1120;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
+}
+
+/* Ajuste para la esquina donde se encuentran las dos barras */
+.dark ::-webkit-scrollbar-corner {
+  background: #0b1120;
+}
+
+/* Animaciones para Toast */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out forwards;
+}
