@@ -53,9 +53,7 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
 
   // --- 3. MAPEO DE DATOS (BODY) ---
   const body = items.map((item) => {
-    const tarea = item.gestion?.tarea || item.full_data?.gestion?.tarea || "-";
-    const accion = item.gestion?.accion || item.full_data?.gestion?.accion || "-";
-    const tieneAccion = accion && accion !== "-";
+    const tarea = item.gestion?.tarea || item.full_data?.tarea || "-";
     const tieneTarea = tarea && tarea !== "-";
 
     const tareaStyles = {
@@ -65,12 +63,6 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
       textColor: tieneTarea ? [120, 53, 15] : [100, 100, 100],
     };
 
-    const accionStyles = {
-      fontSize: 8,
-      valign: "middle",
-      fillColor: tieneAccion ? [220, 252, 231] : [255, 255, 255],
-      textColor: tieneAccion ? [20, 83, 45] : [100, 100, 100],
-    };
 
     return {
       cliente: item.nombre_cliente || "Sin Nombre",
@@ -79,7 +71,6 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
       vencido: currency(item.full_data?.saldo_vencido),
       _vencidoRaw: item.full_data?.saldo_vencido || 0,
       tarea: { content: tarea, styles: tareaStyles },
-      accion: { content: accion, styles: accionStyles },
     };
   });
 
@@ -92,7 +83,6 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
       { header: "Ruta", dataKey: "ruta" },
       { header: "Vencido", dataKey: "vencido" },
       { header: "Tarea", dataKey: "tarea" },
-      { header: "Acción", dataKey: "accion" },
     ],
     body: body,
     theme: "grid",
@@ -118,7 +108,6 @@ export const generatePlanificacionPDF = (items, datePlanificacion) => {
       ruta: { cellWidth: 22, halign: "center" },
       vencido: { cellWidth: 25, halign: "right", fontStyle: "bold" },
       tarea: { cellWidth: 80 },
-      accion: { cellWidth: 80 },
     },
     // Hook para pintar el texto de "Vencido" en rojo si es mayor a 0
     didParseCell: (data) => {
