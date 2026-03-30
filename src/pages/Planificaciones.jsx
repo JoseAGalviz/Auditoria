@@ -277,27 +277,75 @@ const PlanificacionTable = ({ items }) => (
                       </span>
                     </div>
                   )}
+                  {item.full_data?.fecha_compra && (
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 px-1 pt-1 border-t border-gray-100 dark:border-gray-800">
+                      <span>Últ. Compra:</span>
+                      <span className="font-mono text-[10px]">{item.full_data.fecha_compra}</span>
+                    </div>
+                  )}
                 </div>
               </td>
 
               {/* Columna Tarea / Acción */}
               <td className="p-4 align-top">
                 {(() => {
-                  const tarea = item.full_data?.gestion?.tarea;
-                  const accion = item.full_data?.gestion?.accion;
+                  const tarea = item.gestion?.tarea || item.full_data?.tarea;
+                  const accion = item.gestion?.accion || item.full_data?.accion;
                   const isCobranza = tarea?.toLowerCase().includes("cobranza");
+                  const gestiones = Array.isArray(item.full_data?.gestion) ? item.full_data.gestion : [];
 
-                  return tarea || accion ? (
-                    <div className={`p-3 rounded-lg border text-xs ${
-                      isCobranza
-                        ? "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-900/20 dark:border-rose-800 dark:text-rose-300"
-                        : "bg-blue-50 border-blue-100 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
-                    }`}>
-                      {tarea && <p className="font-semibold">{tarea}</p>}
-                      {accion && <p className="mt-1 italic opacity-80">{accion}</p>}
+                  return (
+                    <div className="flex flex-col gap-2">
+                      {tarea || accion ? (
+                        <div className={`p-3 rounded-lg border text-xs ${
+                          isCobranza
+                            ? "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-900/20 dark:border-rose-800 dark:text-rose-300"
+                            : "bg-blue-50 border-blue-100 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+                        }`}>
+                          {tarea && <p className="font-semibold">{tarea}</p>}
+                          {accion && <p className="mt-1 italic opacity-80">{accion}</p>}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs italic">Sin tarea registrada</span>
+                      )}
+
+                      {gestiones.length > 0 && (
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          {gestiones.map((g, gi) => {
+                            const tipoGestion = g.venta_tipoGestion || g.cobranza_tipoGestion || g.tipo_gestion || null;
+                            const descripcion = g.venta_descripcion || g.cobranza_descripcion || null;
+                            const esConcretada = tipoGestion === "concretada";
+                            const fechaGestion = g.fecha_registro
+                              ? new Date(g.fecha_registro.replace(" ", "T")).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })
+                              : null;
+
+                            return (
+                              <div
+                                key={gi}
+                                className={`flex flex-col gap-0.5 px-2 py-1.5 rounded text-[10px] border ${
+                                  esConcretada
+                                    ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-400"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${esConcretada ? "bg-emerald-500" : "bg-gray-400"}`} />
+                                  {tipoGestion && (
+                                    <span className="font-bold uppercase">{tipoGestion}</span>
+                                  )}
+                                  {fechaGestion && (
+                                    <span className="ml-auto opacity-70">{fechaGestion}</span>
+                                  )}
+                                </div>
+                                {descripcion && (
+                                  <p className="pl-3.5 italic opacity-80 leading-snug">{descripcion}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span className="text-gray-400 text-xs italic">Sin tarea registrada</span>
                   );
                 })()}
 
