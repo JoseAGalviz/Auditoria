@@ -1353,7 +1353,8 @@ const Matriz = () => {
                   showToast("No hay datos filtrados para exportar", "error");
                   return;
                 }
-                generateDailyAuditExcel(filteredData, selectedDay);
+                generateDailyAuditExcel(filteredData);
+
                 showToast("Excel generado con éxito", "success");
               }}
               className="px-4 py-3 bg-[#1a9888] text-white rounded-xl hover:bg-[#158072] transition-all shadow-lg shadow-teal-900/20 flex items-center gap-2"
