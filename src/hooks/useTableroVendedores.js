@@ -78,7 +78,7 @@ export const useTableroVendedores = (selectedDate = null) => {
           dia: selectedDateISO,
         };
 
-        const KPI_URL = "http://192.168.4.69:3000/api/kpi-metas";
+        const KPI_URL = "http://192.168.4.23:3000/api/kpi-metas";
         const fetchKpi = (p) =>
           fetch(KPI_URL, {
             method: "POST",

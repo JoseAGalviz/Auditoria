@@ -7,7 +7,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 export default defineConfig({
   plugins: [react(), tailwindcss(), nodePolyfills()],
   server: {
-    host: "192.168.4.69",
+    host: "192.168.4.23",
     port: 4000,
   },
 });
