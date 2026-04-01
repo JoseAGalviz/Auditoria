@@ -90,7 +90,7 @@ const Vendedores = () => {
   const [selectedDate, setSelectedDate] = useState(formatDateLocal(new Date()));
   // Alertas automáticas: visibles desde las 5:00 PM hasta las 8:00 AM del día siguiente
   const currentHour = new Date().getHours();
-  const isAlertTime = currentHour >= 17 || currentHour < 8;
+  const isAlertTime = currentHour >= 18 || currentHour < 8;
 
   const timeStrToMinutes = (timeStr) => {
     if (!timeStr) return null;
@@ -316,12 +316,12 @@ const Vendedores = () => {
 
                 const carteraPercent =
                   typeof row.carteraActiva === "number" &&
-                    row.carteraActiva <= 100
+                  row.carteraActiva <= 100
                     ? row.carteraActiva
                     : null;
                 const ventasPercent =
                   typeof row.ventas_factura_sum === "number" &&
-                    row.ventas_factura_sum <= 100
+                  row.ventas_factura_sum <= 100
                     ? row.ventas_factura_sum
                     : null;
                 return (

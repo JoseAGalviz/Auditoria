@@ -21,7 +21,7 @@ import ModalRevisionAlerta from "../components/ModalRevisionAlerta";
 import ModalCrearObservacion from "../components/ModalCrearObservacion";
 import ModalVerObservacion from "../components/ModalVerObservacion";
 
-const AUTO_SAVE_HOUR = 17; // Hora a la que se generan las automáticas (5:00 PM)
+const AUTO_SAVE_HOUR = 18; // Hora a la que se generan las automáticas (5:00 PM)
 const LAST_SAVE_KEY = "auditoria_auto_obs_last_save"; // Este sí se queda en localStorage como "testigo"
 
 const camposOptions = [
@@ -88,13 +88,17 @@ const estaEnRango = (fechaString, inicio, fin) => {
 };
 
 const LIMITE_SALIDA_MIN = 8 * 60 + 45; // 8:45 AM
-const LIMITE_LLEGADA_MIN = 18 * 60; // CAMBIADO A 6:00 PM
+const LIMITE_LLEGADA_MIN = 18 * 60; // 6:00 PM
 
 const computeAutoObservaciones = (tab) => {
   if (!tab || tab.length === 0) return [];
   const grupos = {};
 
+  console.log("computeAutoObservaciones - Datos de vendedores:", tab);
+
   tab.forEach((v) => {
+    console.log(`Procesando vendedor: ${v.vendedor}, reportesEstablecidos: ${v.reportesEstablecidos}, reportesLogrados: ${v.reportesLogrados}, hora_1_ven: ${v.hora_1_ven}, hora_2_ven: ${v.hora_2_ven}, negociaciones: ${v.negociaciones}, gestionesEfectivas: ${v.gestionesEfectivas}`);
+
     const addAlerta = (alerta) => {
       if (!grupos[v.vendedor]) {
         grupos[v.vendedor] = { vendedor: v.vendedor, alertas: [] };
@@ -104,6 +108,7 @@ const computeAutoObservaciones = (tab) => {
 
     const salidaMin = timeStrToMinutes(v.hora_1_ven);
     if (salidaMin !== null && salidaMin > LIMITE_SALIDA_MIN) {
+      console.log(`Alerta salida: ${v.vendedor} - salidaMin: ${salidaMin} > ${LIMITE_SALIDA_MIN}`);
       addAlerta({
         campo: "auditoria",
         descripcion: `Primera actividad registrada a las ${minutesToAmPm(salidaMin)}, superando el límite de 8:45 AM.`,
@@ -113,37 +118,54 @@ const computeAutoObservaciones = (tab) => {
 
     const llegadaMin = timeStrToMinutes(v.hora_2_ven);
     if (llegadaMin !== null && llegadaMin < LIMITE_LLEGADA_MIN) {
+      console.log(`Alerta llegada: ${v.vendedor} - llegadaMin: ${llegadaMin} < ${LIMITE_LLEGADA_MIN}`);
       addAlerta({
         campo: "auditoria",
-        descripcion: `Último registro a las ${minutesToAmPm(llegadaMin)}, antes de las 6:00 PM de cierre.`,
+        descripcion: `Último registro a las ${minutesToAmPm(llegadaMin)}, antes de las 5:00 PM de cierre.`,
         severidad: "warning",
       });
     }
 
-    if (
+    if (v.reportesLogrados === 0) {
+      console.log(`Alerta reportes: ${v.vendedor} - reportesLogrados: 0`);
+      addAlerta({
+        campo: "rendimiento",
+        descripcion: `No realizó ningún reporte establecido.`,
+        severidad: "error",
+      });
+    } else if (
       v.reportesEstablecidos > 0 &&
       v.reportesLogrados < v.reportesEstablecidos
     ) {
+      console.log(`Alerta reportes: ${v.vendedor} - reportesLogrados: ${v.reportesLogrados} < ${v.reportesEstablecidos}`);
+      let razon = "";
+      if (v.reportesLogrados === 0) {
+        razon = " No realizó ningún reporte. Posible razón: Falta de actividad registrada, problemas técnicos o ausencia del vendedor.";
+      } else {
+        razon = ` Completó solo ${v.reportesLogrados} de ${v.reportesEstablecidos}. Posible razón: Tiempo insuficiente, interrupciones en la jornada o gestiones incompletas.`;
+      }
       addAlerta({
         campo: "rendimiento",
-        descripcion: `Completó ${v.reportesLogrados} de ${v.reportesEstablecidos} reportes establecidos.`,
+        descripcion: `Reportes incompletos: Completó ${v.reportesLogrados} de ${v.reportesEstablecidos} reportes establecidos.${razon}`,
         severidad: "error",
       });
     }
 
-    const percPlanif =
-      v.reportesEstablecidos > 0
-        ? (v.gestionesEfectivas / v.reportesEstablecidos) * 100
+    const percEfectividad =
+      v.reportesLogrados > 0
+        ? (v.gestionesEfectivas / v.reportesLogrados) * 100
         : 0;
-    if (v.reportesEstablecidos > 0 && percPlanif < 70) {
+    if (v.reportesLogrados > 0 && percEfectividad < 70) {
+      console.log(`Alerta efectividad: ${v.vendedor} - percEfectividad: ${percEfectividad.toFixed(1)}% < 70%`);
       addAlerta({
         campo: "planificaciones",
-        descripcion: `Porcentaje de planificación efectiva: ${percPlanif.toFixed(1)}% (mínimo requerido: 70%).`,
+        descripcion: `Porcentaje de efectividad bajo: ${percEfectividad.toFixed(1)}% (mínimo requerido: 70%).`,
         severidad: "error",
       });
     }
 
     if ((v.negociaciones ?? 0) < 1) {
+      console.log(`Alerta negociaciones: ${v.vendedor} - negociaciones: ${v.negociaciones} < 1`);
       addAlerta({
         campo: "rendimiento",
         descripcion: `Sin negociaciones registradas el día de hoy.`,
@@ -152,6 +174,7 @@ const computeAutoObservaciones = (tab) => {
     }
   });
 
+  console.log("Alertas generadas:", Object.values(grupos));
   return Object.values(grupos);
 };
 
@@ -197,36 +220,43 @@ export default function Observaciones() {
 
   // 2. Disparador Automático a las 6:00 PM
   useEffect(() => {
-    if (loadingVendedores || !vendedoresTab || vendedoresTab.length === 0)
+    if (loadingVendedores || !vendedoresTab || vendedoresTab.length === 0) {
+      console.log("useEffect auto: loading o no data", { loadingVendedores, vendedoresTabLength: vendedoresTab?.length });
       return;
+    }
 
     // SEGURO: Solo generar automáticas si el filtro actual es el día de "HOY"
     const isHoy =
       rango.inicio === new Date().toISOString().split("T")[0] &&
       rango.fin === new Date().toISOString().split("T")[0];
+    console.log("useEffect auto: isHoy", isHoy, "rango:", rango);
     if (!isHoy) return;
 
     const currentHour = new Date().getHours();
     const todayString = new Date().toDateString();
     const lastSaveDate = localStorage.getItem(LAST_SAVE_KEY);
 
+    console.log("useEffect auto: currentHour", currentHour, "AUTO_SAVE_HOUR", AUTO_SAVE_HOUR, "lastSaveDate", lastSaveDate, "todayString", todayString);
+
     // Si pasaron las 6 PM y no hemos guardado hoy...
     if (currentHour >= AUTO_SAVE_HOUR && lastSaveDate !== todayString) {
       const computedAlerts = computeAutoObservaciones(vendedoresTab);
 
       if (computedAlerts.length > 0) {
+        console.log("Guardando alertas:", computedAlerts);
         apiService
           .guardarObservacionesAuto(computedAlerts)
           .then(() => {
             localStorage.setItem(LAST_SAVE_KEY, todayString);
             toast.info("Alertas Automáticas", {
               description:
-                "Se han detectado y registrado las incidencias del día a las 6:00 PM.",
+                "Se han detectado y registrado las incidencias del día a las 5:00 PM.",
             });
             fetchObservaciones();
           })
           .catch((err) => console.error("Error guardando alertas:", err));
       } else {
+        console.log("No hay alertas para guardar");
         localStorage.setItem(LAST_SAVE_KEY, todayString);
       }
     }

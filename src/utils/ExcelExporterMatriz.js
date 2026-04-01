@@ -19,6 +19,18 @@ export const generateDailyAuditExcel = (data) => {
     },
   };
 
+  const dayGroupStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+    fill: { fgColor: { rgb: "0D5B52" } }, // Teal más oscuro para resaltar el día
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left: { style: "medium", color: { rgb: "000000" } },
+      right: { style: "medium", color: { rgb: "000000" } },
+    },
+  };
+
   const cellStyle = {
     alignment: { horizontal: "center", vertical: "center" },
     border: {
@@ -43,112 +55,129 @@ export const generateDailyAuditExcel = (data) => {
     };
   };
 
-  const headers = [
-    "Cliente",
-    "Código",
-    "Zona",
-    "Día Semana",
-    "Inicio Whats (E)",
-    "Inicio Whats (C)",
+  // Etiquetas de gestión (16 columnas)
+  const managementLabels = [
+    "I. Whats (E)",
+    "I. Whats (C)",
     "Venta (E)",
     "Venta (P)",
     "Venta (N)",
-    "Cobranza (E)",
-    "Cobranza (P)",
-    "Cobranza (N)",
+    "Cobro (E)",
+    "Cobro (P)",
+    "Cobro (N)",
     "CP",
-    "Llamada Venta (E)",
-    "Llamada Venta (P)",
-    "Llamada Venta (N)",
-    "Llamada Cobro (E)",
-    "Llamada Cobro (P)",
-    "Llamada Cobro (N)",
-    "Observación del Día",
+    "Llam. Venta (E)",
+    "Llam. Venta (P)",
+    "Llam. Venta (N)",
+    "Llam. Cobro (E)",
+    "Llam. Cobro (P)",
+    "Llam. Cobro (N)",
+    "Observación",
   ];
 
-  // --- 2. GENERAR UNA HOJA POR CADA DÍA ---
-  days.forEach((dayKey) => {
-    const rows = [];
-    data.forEach((row) => {
-      const dayData = row.auditoria?.[dayKey] || {};
-      const check = (val, char) => (val ? char : "");
+  // --- 2. GENERAR UNA HOJA POR CADA DÍA (CUMULATIVA) ---
+  days.forEach((currentDayKey, dayIdx) => {
+    const activeDays = days.slice(0, dayIdx + 1);
 
-      rows.push([
-        row.nombre,
-        row.codigo,
-        row.zona,
-        dayKey.toUpperCase(),
-        check(dayData.inicio_whatsapp?.e, "E"),
-        check(dayData.inicio_whatsapp?.c, "C"),
-        check(dayData.accion_venta?.e, "E"),
-        check(dayData.accion_venta?.p, "P"),
-        check(dayData.accion_venta?.n, "N"),
-        check(dayData.accion_cobranza?.e, "E"),
-        check(dayData.accion_cobranza?.p, "P"),
-        check(dayData.accion_cobranza?.n, "N"),
-        check(dayData.cp, "X"),
-        check(dayData.llamadas_venta?.e, "E"),
-        check(dayData.llamadas_venta?.p, "P"),
-        check(dayData.llamadas_venta?.n, "N"),
-        check(dayData.llamadas_cobranza?.e, "E"),
-        check(dayData.llamadas_cobranza?.p, "P"),
-        check(dayData.llamadas_cobranza?.n, "N"),
-        dayData.observacion || "",
-      ]);
+    // Header 1: Títulos de los días (Combinados)
+    const headerRow1 = ["", "", ""]; // Espacio para Cliente, Código, Zona
+    activeDays.forEach((d) => {
+      headerRow1.push(d.toUpperCase());
+      // Llenamos con vacíos para los merges (15 más para un total de 16)
+      for (let i = 0; i < 15; i++) headerRow1.push("");
     });
 
-    const worksheetData = [headers, ...rows];
+    // Header 2: Etiquetas específicas
+    const headerRow2 = ["Cliente", "Código", "Zona"];
+    activeDays.forEach(() => {
+      headerRow2.push(...managementLabels);
+    });
+
+    // Filas de Datos
+    const rows = data.map((client) => {
+      const rowData = [client.nombre, client.codigo, client.zona];
+      
+      activeDays.forEach((dKey) => {
+        const audit = client.auditoria?.[dKey] || {};
+        const check = (val, char) => (val ? char : "");
+        
+        rowData.push(
+          check(audit.inicio_whatsapp?.e, "E"),
+          check(audit.inicio_whatsapp?.c, "C"),
+          check(audit.accion_venta?.e, "E"),
+          check(audit.accion_venta?.p, "P"),
+          check(audit.accion_venta?.n, "N"),
+          check(audit.accion_cobranza?.e, "E"),
+          check(audit.accion_cobranza?.p, "P"),
+          check(audit.accion_cobranza?.n, "N"),
+          check(audit.cp, "X"),
+          check(audit.llamadas_venta?.e, "E"),
+          check(audit.llamadas_venta?.p, "P"),
+          check(audit.llamadas_venta?.n, "N"),
+          check(audit.llamadas_cobranza?.e, "E"),
+          check(audit.llamadas_cobranza?.p, "P"),
+          check(audit.llamadas_cobranza?.n, "N"),
+          audit.observacion || ""
+        );
+      });
+      return rowData;
+    });
+
+    const worksheetData = [headerRow1, headerRow2, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
 
-    // Aplicar estilos
+    // DEFINIR MERGES para los títulos de los días
+    const merges = [];
+    activeDays.forEach((_, idx) => {
+      const startCol = 3 + idx * 16;
+      const endCol = startCol + 15;
+      merges.push({ s: { r: 0, c: startCol }, e: { r: 0, c: endCol } });
+    });
+    ws["!merges"] = merges;
+
+    // APLICAR ESTILOS
     const range = XLSX.utils.decode_range(ws["!ref"]);
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
         if (!ws[cellAddress]) continue;
 
+        const cell = ws[cellAddress];
+
         if (R === 0) {
-          ws[cellAddress].s = headerStyle;
+          // Fila de Títulos de Día (solo aplicar estilo a las celdas con texto o merges)
+          if (C >= 3) cell.s = dayGroupStyle;
+        } else if (R === 1) {
+          // Fila de Etiquetas
+          cell.s = headerStyle;
         } else {
-          const val = ws[cellAddress].v;
+          // Filas de Datos
+          const val = cell.v;
           if (["E", "P", "N", "X"].includes(val)) {
-            ws[cellAddress].s = getStatusStyle(val);
+            cell.s = getStatusStyle(val);
           } else {
-            ws[cellAddress].s = cellStyle;
+            cell.s = cellStyle;
           }
         }
       }
     }
 
-    // Ajustar columnas
-    ws["!cols"] = [
-      { wch: 35 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 5 },
-      { wch: 40 },
-    ];
+    // AJUSTAR ANCHOS DE COLUMNAS
+    const cols = [{ wch: 35 }, { wch: 10 }, { wch: 15 }]; // Info base
+    activeDays.forEach(() => {
+      for (let i = 0; i < 15; i++) cols.push({ wch: 7 }); // Gestión
+      cols.push({ wch: 35 }); // Observación
+    });
+    ws["!cols"] = cols;
 
-    // Nombre de la hoja (capitalizado)
-    const sheetName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
+    // Agregar hoja
+    const sheetName = currentDayKey.charAt(0).toUpperCase() + currentDayKey.slice(1);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  const fileName = `Auditoria_Semanal_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  // GENERAR Y DESCARGAR
+  const fileName = `Auditoria_Acumulada_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(wb, fileName);
 };
+
+
