@@ -8,9 +8,9 @@ import {
 } from "../utils/geolocalizacion";
 // import { obtenerDireccionBDC } from "../utils/obtenerDireccion";
 
-// --- HELPER: filtrar datos del DÍA DE HOY ---
-const esHoy = (fechaString) => {
-  if (!fechaString) return true;
+// --- HELPER: filtrar datos del DÍA SELECCIONADO ---
+const esFechaSeleccionada = (fechaString, fechaSeleccionadaISO) => {
+  if (!fechaString || !fechaSeleccionadaISO) return true;
 
   let fecha = new Date(fechaString);
 
@@ -24,11 +24,11 @@ const esHoy = (fechaString) => {
 
   if (isNaN(fecha.getTime())) return true;
 
-  const hoy = new Date();
+  const fechaSeleccionada = new Date(fechaSeleccionadaISO + 'T00:00:00');
   return (
-    fecha.getFullYear() === hoy.getFullYear() &&
-    fecha.getMonth() === hoy.getMonth() &&
-    fecha.getDate() === hoy.getDate()
+    fecha.getFullYear() === fechaSeleccionada.getFullYear() &&
+    fecha.getMonth() === fechaSeleccionada.getMonth() &&
+    fecha.getDate() === fechaSeleccionada.getDate()
   );
 };
 
@@ -248,7 +248,7 @@ export const useTableroVendedores = (selectedDate = null) => {
         item.full_data?.fecha ||
         item.full_data?.created_at;
 
-      if (!esHoy(fechaRegistro)) {
+      if (!esFechaSeleccionada(fechaRegistro, selectedDateISO)) {
         return;
       }
 

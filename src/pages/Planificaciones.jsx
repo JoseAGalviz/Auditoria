@@ -36,6 +36,19 @@ const formatCurrency = (amount) => {
   }).format(amount || 0);
 };
 
+const normalizeGestion = (gestion) => {
+  if (!gestion) return [];
+  if (Array.isArray(gestion)) return gestion;
+  if (typeof gestion === "object" && Object.keys(gestion).length > 0) return [gestion];
+  return [];
+};
+
+const getGestiones = (item) => {
+  const itemGestiones = normalizeGestion(item.gestion);
+  const fullDataGestiones = normalizeGestion(item.full_data?.gestion);
+  return itemGestiones.length > 0 ? itemGestiones : fullDataGestiones;
+};
+
 // --- COMPONENTES UI ---
 
 
@@ -201,9 +214,8 @@ const PlanificacionTable = ({ items }) => (
       </thead>
       <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
         {items.map((item) => {
-          const hasGestion =
-            Array.isArray(item.full_data?.gestion) &&
-            item.full_data.gestion.length > 0;
+          const gestiones = getGestiones(item);
+          const hasGestion = gestiones.length > 0;
 
           return (
             <tr
@@ -292,7 +304,6 @@ const PlanificacionTable = ({ items }) => (
                   const tarea = item.gestion?.tarea || item.full_data?.tarea;
                   const accion = item.gestion?.accion || item.full_data?.accion;
                   const isCobranza = tarea?.toLowerCase().includes("cobranza");
-                  const gestiones = Array.isArray(item.full_data?.gestion) ? item.full_data.gestion : [];
 
                   return (
                     <div className="flex flex-col gap-2">
@@ -385,9 +396,10 @@ const PlanificacionGroup = memo(({ items }) => {
 
   const cumplimientoData = useMemo(() => {
     const clientesPlanificados = items.length;
-    const gestionesRealizadas = items.filter(
-      (item) => Array.isArray(item.full_data?.gestion) && item.full_data.gestion.length > 0,
-    ).length;
+    const gestionesRealizadas = items.filter((item) => {
+      const gestiones = getGestiones(item);
+      return gestiones.length > 0;
+    }).length;
     const porcentaje = clientesPlanificados > 0
       ? Math.round((gestionesRealizadas / clientesPlanificados) * 100)
       : 0;
